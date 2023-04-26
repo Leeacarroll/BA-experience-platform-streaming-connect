@@ -15,18 +15,32 @@ package com.adobe.platform.streaming.integration;
 import com.adobe.platform.streaming.http.HttpException;
 import com.adobe.platform.streaming.http.HttpUtil;
 
+import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
+import mockit.Expectations;
+import mockit.Mock;
+import mockit.MockUp;
+import mockit.Mocked;
+import mockit.integration.junit4.JMockit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
@@ -36,6 +50,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 /**
  * @author Adobe Inc.
  */
+
 @Tag("integration")
 public class AEPSinkConnectorTest extends AbstractConnectorTest {
 
@@ -47,7 +62,12 @@ public class AEPSinkConnectorTest extends AbstractConnectorTest {
   private static final String AEP_CONNECTOR_JWT_AUTH_CONFIG = "aep-connector-with-jwt-token.json";
   private static final String AEP_CONNECTOR_JWT_AUTH_PROXY_CONFIG = "aep-connector-with-jwt-token-proxy.json";
   private static final String AEP_CONNECTOR_CONFIG_WITH_PROXY = "aep-connector-with-proxy.json";
+
+  private static final String AEP_CONNECTOR_JWT_AUTH_WITHs3_PATH_CONFIG = "aep-connector-with-jwt-token-s3-path.json";
+
   private static final String XDM_PAYLOAD_FILE = "xdm-data.json";
+
+  private S3MockContainer s3Mock;
 
   @BeforeEach
   @Override
@@ -217,6 +237,20 @@ public class AEPSinkConnectorTest extends AbstractConnectorTest {
   public Map<String, String> connectorConfigWithJWTConfig() throws HttpException, JsonProcessingException {
     String connectorProperties = String.format(HttpUtil.streamToString(this.getClass().getClassLoader()
       .getResourceAsStream(AEP_CONNECTOR_JWT_AUTH_CONFIG)),
+      NUMBER_OF_TASKS,
+      getInletUrl(),
+      getBaseUrl(),
+      this.getClass().getClassLoader().getResource("secret.key").getPath());
+
+    Map<String, String> connectorConfig = MAPPER.readValue(connectorProperties,
+      new TypeReference<Map<String, String>>() {});
+    connectorConfig.put("name", CONNECTOR_NAME);
+    return connectorConfig;
+  }
+
+  public Map<String, String>   connectorConfigWithJWTConfigWithS3Path() throws HttpException, JsonProcessingException {
+    String connectorProperties = String.format(HttpUtil.streamToString(this.getClass().getClassLoader()
+      .getResourceAsStream(AEP_CONNECTOR_JWT_AUTH_WITHs3_PATH_CONFIG)),
       NUMBER_OF_TASKS,
       getInletUrl(),
       getBaseUrl(),

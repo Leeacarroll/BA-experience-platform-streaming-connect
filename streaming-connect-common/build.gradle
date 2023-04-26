@@ -15,6 +15,6 @@ apply from: '../dependencies.gradle'
 dependencies {
     implementation libraries.collections4, libraries.commonslang, libraries.guava,
                    libraries.httpClient, libraries.jackson, libraries.jmockit, libraries.junitJupiter,
-                   libraries.jjwt, libraries.orgJson, libraries.slf4j, libraries.jaxb
+                   libraries.jjwt, libraries.orgJson, libraries.slf4j, libraries.jaxb, libraries.aws
     testImplementation libraries.jmockit, libraries.junitJupiter
 }

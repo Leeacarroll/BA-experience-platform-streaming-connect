@@ -7,8 +7,6 @@
   "key.converter.schemas.enable": "false",
   "value.converter.schemas.enable": "false",
   "aep.endpoint": "%s",
-  "aep.connection.proxy.host": "localhost",
-  "aep.connection.proxy.port": "%s",
   "aep.connection.auth.enabled": true,
   "aep.connection.auth.endpoint": "%s",
   "aep.connection.auth.token.type": "jwt_token",
@@ -16,5 +14,5 @@
   "aep.connection.auth.client.secret": "client_secret",
   "aep.connection.auth.imsOrg": "imsOrg@AdobeOrg",
   "aep.connection.auth.accountKey": "technical-account-id",
-  "aep.connection.auth.filePath": "C:/Users/u207754/Documents/git/ba-experience-platform-streaming-connect/BA-experience-platform-streaming-connect/streaming-connect-sink/src/test/resources/secret.key"
+  "aep.connection.auth.filePath": "https://s3.eu-central-1.amazonaws.com/bucket-name/key-name"
 }

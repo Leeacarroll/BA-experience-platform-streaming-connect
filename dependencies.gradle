@@ -30,6 +30,8 @@ versions.kafkaConnect = '2.8.0'
 versions.slf4j = '1.7.25'
 versions.jaxb = '2.3.0'
 versions.wiremock = '2.27.2'
+versions.awsS3 = '1.12.452'
+versions.locals3 = '2.11.0'
 
 libraries.collections4 = [
   "org.apache.commons:commons-collections4:$versions.collections4"
@@ -105,3 +107,14 @@ libraries.slf4j = [
 libraries.jaxb = [
   "javax.xml.bind:jaxb-api:$versions.jaxb"
 ]
+
+libraries.aws = [
+  "com.amazonaws:aws-java-sdk-s3:$versions.awsS3"
+]
+
+libraries.locals3 = [
+        "com.adobe.testing:s3mock-testcontainers:$versions.locals3"
+]
+
+
+

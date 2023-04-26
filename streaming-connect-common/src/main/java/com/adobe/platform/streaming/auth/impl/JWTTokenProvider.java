@@ -18,6 +18,13 @@ import com.adobe.platform.streaming.auth.AuthUtils;
 import com.adobe.platform.streaming.auth.TokenResponse;
 import com.adobe.platform.streaming.http.HttpException;
 import com.adobe.platform.streaming.http.HttpProducer;
+
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.S3Object;
+
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.commons.lang3.StringUtils;
@@ -27,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,6 +47,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.lang.Boolean.TRUE;
 
@@ -56,7 +66,7 @@ public class JWTTokenProvider extends AbstractAuthProvider {
   private static final String JWT_ISS_KEY = "iss";
   private static final String JWT_AUD_KEY = "aud";
   private static final String JWT_SUB_KEY = "sub";
-
+  private static final String S3_FILEPATH_PATTERN_STRING = "https:\\/\\/s3\\.(.*?)\\..*\\/(.*)\\/(.*)";
   private String endpoint = System.getenv(AuthUtils.AUTH_ENDPOINT);
   private final String imsOrgId;
   private final String technicalAccountKey;
@@ -122,6 +132,59 @@ public class JWTTokenProvider extends AbstractAuthProvider {
   }
 
   private void refreshJWTToken() throws AuthException {
+    try {
+
+      // Create JWT payload
+      Map<String, Object> jwtClaims = new HashMap<>();
+      jwtClaims.put(JWT_ISS_KEY, imsOrgId);
+      jwtClaims.put(JWT_SUB_KEY, technicalAccountKey);
+      jwtClaims.put(JWT_EXPIRY_KEY, System.currentTimeMillis() / 1000 + JWT_TOKEN_EXPIRATION_THRESHOLD);
+      jwtClaims.put(JWT_AUD_KEY, endpoint + "/c/" + clientId);
+      for (String metaScope : new String[]{ "ent_dataservices_sdk" }) {
+        jwtClaims.put(endpoint + "/s/" + metaScope, TRUE);
+      }
+      byte[] privateKeyBytes = getPrivateKeyFileBytes();
+      KeySpec ks = new PKCS8EncodedKeySpec(privateKeyBytes);
+      RSAPrivateKey privateKey = (RSAPrivateKey) KeyFactory.getInstance("RSA").generatePrivate(ks);
+      jwtToken = Jwts.builder().setClaims(jwtClaims).signWith(SignatureAlgorithm.RS256, privateKey).compact();
+    } catch (Exception ex) {
+      throw new AuthException(ex.getMessage(), ex);
+    }
+  }
+
+  private byte[] getPrivateKeyFileBytes() throws AuthException {
+
+    if (keyPath.matches(S3_FILEPATH_PATTERN_STRING)) {
+      Pattern s3Pattern = Pattern.compile(S3_FILEPATH_PATTERN_STRING);
+      Matcher s3PatternMatch = s3Pattern.matcher(keyPath);
+      s3PatternMatch.find();
+      if (s3PatternMatch.groupCount() != 3) {
+        throw new AuthException("Cannot retrieve s3 object invalid path : " + "masked s3 url");
+      }
+      return getBytesFromS3Repository(s3PatternMatch.group(1),s3PatternMatch.group(2),
+              s3PatternMatch.group(3));
+    } else {
+      return getBytesFromFilePath();
+    }
+  }
+
+  private static byte[] getBytesFromS3Repository(String region, String bucket, String resourceName)
+      throws AuthException {
+    LOG.info("retrieving private key from s3 repository: {}", "masked s3 path");
+    AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+      .withRegion(region)
+      .withCredentials(new ProfileCredentialsProvider())
+      .build();
+    S3Object fullObject = s3Client.getObject(new GetObjectRequest(bucket, resourceName));
+    try {
+      return fullObject.getObjectContent().readAllBytes();
+    } catch (Exception e) {
+      throw new AuthException("Cannot retrieve s3 object : " + "masked s3 url");
+    }
+  }
+
+  private byte[] getBytesFromFilePath() throws AuthException {
+    LOG.info("retrieving private key from filepath: {}", "masked file path");
     File file = new File(keyPath);
     if (file.exists()) {
       try {
@@ -132,22 +195,9 @@ public class JWTTokenProvider extends AbstractAuthProvider {
         if (size > 1024 * 1024) {
           throw new AuthException("Size of private file is greater than 1 MB, file path : " + keyPath);
         }
-
-        // Create JWT payload
-        Map<String, Object> jwtClaims = new HashMap<>();
-        jwtClaims.put(JWT_ISS_KEY, imsOrgId);
-        jwtClaims.put(JWT_SUB_KEY, technicalAccountKey);
-        jwtClaims.put(JWT_EXPIRY_KEY, System.currentTimeMillis() / 1000 + JWT_TOKEN_EXPIRATION_THRESHOLD);
-        jwtClaims.put(JWT_AUD_KEY, endpoint + "/c/" + clientId);
-        for (String metaScope : new String[]{ "ent_dataservices_sdk" }) {
-          jwtClaims.put(endpoint + "/s/" + metaScope, TRUE);
-        }
-
-        KeySpec ks = new PKCS8EncodedKeySpec(Files.readAllBytes(path));
-        RSAPrivateKey privateKey = (RSAPrivateKey) KeyFactory.getInstance("RSA").generatePrivate(ks);
-        jwtToken = Jwts.builder().setClaims(jwtClaims).signWith(SignatureAlgorithm.RS256, privateKey).compact();
+        return Files.readAllBytes(path);
       } catch (Exception ex) {
-        throw new AuthException(ex.getMessage(), ex);
+        throw new AuthException("File does not exist at location : " + keyPath);
       }
     } else {
       throw new AuthException("File does not exist at location : " + keyPath);
