@@ -31,6 +31,7 @@ import java.net.PasswordAuthentication;
 import java.net.Proxy;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -133,6 +134,7 @@ public class HttpConnection {
             conn.setRequestProperty(CONTENT_ENCODING, GZIP);
           }
           conn.setRequestProperty(CONTENT_LENGTH, Integer.toString(postData.length));
+
           conn.setDoOutput(true);
           try (OutputStream postStream = conn.getOutputStream()) {
             postStream.write(postData);

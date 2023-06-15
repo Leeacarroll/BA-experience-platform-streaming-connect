@@ -173,12 +173,16 @@ public class JWTTokenProvider extends AbstractAuthProvider {
     LOG.info("retrieving private key from s3 repository: {}", "masked s3 path");
     AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
       .withRegion(region)
-      .withCredentials(new ProfileCredentialsProvider())
       .build();
+    LOG.info("Built s3client");
     S3Object fullObject = s3Client.getObject(new GetObjectRequest(bucket, resourceName));
+    LOG.info("retrieved object from s3 {}", resourceName);
     try {
+      LOG.info("retrieve bytes from private key object");
       return fullObject.getObjectContent().readAllBytes();
+
     } catch (Exception e) {
+      LOG.info("failed to read bytes from private key object");
       throw new AuthException("Cannot retrieve s3 object : " + "masked s3 url");
     }
   }

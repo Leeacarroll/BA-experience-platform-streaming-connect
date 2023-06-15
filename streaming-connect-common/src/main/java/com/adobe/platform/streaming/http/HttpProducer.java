@@ -69,7 +69,6 @@ public class HttpProducer implements Serializable {
       .withPostData(postData)
       .withGzipCompression(enableGzip)
       .build();
-
     try {
       conn.connect();
       return handler.getContent(conn);
